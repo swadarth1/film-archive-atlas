@@ -3,14 +3,15 @@
   const DEFAULT_VIEW = [20, 0];
   const DEFAULT_ZOOM = 2;
   const status = document.querySelector('#status');
-  const map = L.map('map', { zoomControl: true, preferCanvas: true, zoomSnap: 0 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+  const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 20,
     subdomains: 'abcd',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
   }).addTo(map);
 
-  const mapActions = L.control({ position: 'topleft' });
+  const mapActions = L.control({ position: 'topright' });
   mapActions.onAdd = () => {
     const container = L.DomUtil.create('div', 'leaflet-bar atlas-map-actions');
     const addButton = (label, tooltip, icon, action) => {
@@ -23,12 +24,12 @@
       L.DomEvent.on(button, 'click', L.DomEvent.stop)
         .on(button, 'click', action);
     };
-    addButton('Reset map view', 'Reset map to the world view', '↺', () => map.setView(DEFAULT_VIEW, DEFAULT_ZOOM));
     addButton('Toggle fullscreen', 'Enter or exit fullscreen', '⛶', () => {
       const fullscreenTarget = map.getContainer();
       const request = document.fullscreenElement ? document.exitFullscreen() : fullscreenTarget.requestFullscreen();
       request?.catch(error => console.warn('Fullscreen is unavailable.', error));
     });
+    addButton('Reset map view', 'Reset map to the world view', '↺', () => map.setView(DEFAULT_VIEW, DEFAULT_ZOOM));
     return container;
   };
   mapActions.addTo(map);
@@ -106,6 +107,22 @@
     return L.divIcon({ className: 'photo-marker', html: `<span class="photo-marker__frame" style="width:${width}px;height:${height}px"><img class="photo-marker__image" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" style="width:${width}px;height:${height}px"><span class="photo-marker__shine" aria-hidden="true"></span></span>`, iconSize: [width, height], iconAnchor: [width / 2, height / 2], popupAnchor: [0, -21] });
   }
 
+  function keepPopupInView(marker) {
+    const popup = marker.getPopup();
+    popup.update();
+    window.requestAnimationFrame(() => {
+      const popupElement = popup.getElement();
+      if (!popupElement) return;
+      const mapRect = map.getContainer().getBoundingClientRect();
+      const popupRect = popupElement.getBoundingClientRect();
+      const padding = 12;
+      const topOverflow = (mapRect.top + padding) - popupRect.top;
+      const bottomOverflow = popupRect.bottom - (mapRect.bottom - padding);
+      const offset = topOverflow > 0 ? -topOverflow : (bottomOverflow > 0 ? bottomOverflow : 0);
+      if (offset) map.panBy([0, offset], { animate: true, duration: 0.25 });
+    });
+  }
+
   function makeMarker(item) {
     const icon = photoIcon(item);
     const marker = L.marker([Number(item.latitude), Number(item.longitude)], { icon, keyboard: true, title: [item.countryflag, item.city, item.country].filter(Boolean).join(' ') || 'Film photograph', item });
@@ -118,17 +135,24 @@
       };
       if (image?.complete) updateAspect(); else image?.addEventListener('load', updateAspect, { once: true });
     });
-    marker.bindPopup(popupContent(item), { maxWidth: 300, minWidth: 250, closeButton: true });
+    marker.bindPopup(popupContent(item), { maxWidth: 300, minWidth: 250, closeButton: true, keepInView: true });
     if (item.countryflag) marker.bindTooltip(escapeHtml(item.countryflag), { className: 'country-flag-tooltip', direction: 'top', offset: [0, -22], opacity: 1 });
     marker.on('click', () => {
       const zoom = Math.max(map.getZoom() + 2, 7);
-      const offset = map.getSize().y * 0.12;
+      const offset = map.getSize().y * 0.25;
       const center = map.unproject(map.project(marker.getLatLng(), zoom).subtract([0, offset]), zoom);
+      marker.closePopup();
+      map.once('moveend', () => marker.openPopup());
       map.flyTo(center, zoom, { duration: 0.45 });
     });
     marker.on('mouseover', () => marker.setZIndexOffset(1000));
     marker.on('mouseout', () => { if (!marker.isPopupOpen()) marker.setZIndexOffset(0); });
-    marker.on('popupopen', () => { marker.setZIndexOffset(1000); marker.getElement()?.classList.add('is-active'); });
+    marker.on('popupopen', () => {
+      marker.setZIndexOffset(1000);
+      marker.getElement()?.classList.add('is-active');
+      const photo = marker.getPopup().getElement()?.querySelector('.popup-photo');
+      if (photo?.complete) keepPopupInView(marker); else photo?.addEventListener('load', () => keepPopupInView(marker), { once: true });
+    });
     marker.on('popupclose', () => { marker.setZIndexOffset(0); marker.getElement()?.classList.remove('is-active'); });
     return marker;
   }
