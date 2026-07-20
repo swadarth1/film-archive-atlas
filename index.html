@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#e8e7e0" />
+    <title>Film Atlas</title>
+    <link rel="preconnect" href="https://unpkg.com" crossorigin />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="atlas" aria-label="Film Atlas">
+      <div id="map" aria-label="Interactive photo map"></div>
+      <header class="atlas-heading">
+        <h1>film archive atlas</h1>
+      </header>
+      <div id="status" class="status" role="status" aria-live="polite">Loading archive…</div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
