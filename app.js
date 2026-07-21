@@ -22,7 +22,11 @@
     const request = document.fullscreenElement ? document.exitFullscreen() : fullscreenTarget.requestFullscreen();
     request?.catch(error => console.warn('Fullscreen is unavailable.', error));
   };
-  const resetMapView = () => map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+  const resetMapView = () => {
+    if (atlas.classList.contains('is-detail-open')) closeDetail();
+    else if (popupMarker) popupMarker.closePopup();
+    map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+  };
   mapActions.onAdd = () => {
     const container = L.DomUtil.create('div', 'leaflet-bar atlas-map-actions');
     const addButton = (label, shortcut, icon, action) => {
@@ -34,7 +38,7 @@
       L.DomEvent.on(button, 'click', L.DomEvent.stop)
         .on(button, 'click', action);
     };
-    addButton('Toggle fullscreen', 'F for Fullscreen', '⛶', toggleFullscreen);
+    addButton('Toggle fullscreen', 'F to Fullscreen', '⛶', toggleFullscreen);
     addButton('Reset map view', 'R to Reset', '↺', resetMapView);
     return container;
   };
@@ -49,7 +53,7 @@
     }
     if (event.key.toLowerCase() === 'r') resetMapView();
     if (event.key.toLowerCase() === 'f') toggleFullscreen();
-  });
+  }, true);
 
   const markers = L.layerGroup().addTo(map);
 
@@ -113,8 +117,14 @@
   function detailPanelContent(item) {
     const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
     const details = [['Date', item.date ? formatDate(item.date) : ''], ['Camera', item.camera]].filter(([, value]) => value);
-    return `<article class="detail-card">${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<dl class="detail-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
+    const timeline = chronologicalArchive();
+    const index = timeline.indexOf(item);
+    const previousDisabled = index <= 0 ? ' disabled' : '';
+    const nextDisabled = index === -1 || index >= timeline.length - 1 ? ' disabled' : '';
+    return `<article class="detail-card"><nav class="detail-navigation" aria-label="Photo navigation"><button type="button" data-detail-step="-1" aria-label="Previous photograph"${previousDisabled}>←</button><button type="button" data-detail-step="1" aria-label="Next photograph"${nextDisabled}>→</button></nav>${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<dl class="detail-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
   }
+
+  const chronologicalArchive = () => [...archive].sort((a, b) => dateTimestamp(a.date) - dateTimestamp(b.date));
 
   function popupContent(item) {
     const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
@@ -181,7 +191,22 @@
     void detailContent.offsetWidth;
     detailContent.classList.add('is-transitioning');
   }
+  function navigateDetail(step) {
+    const current = activeMarker?.options.item;
+    if (!current) return;
+    const timeline = chronologicalArchive();
+    const nextItem = timeline[timeline.indexOf(current) + step];
+    const nextMarker = nextItem?.marker;
+    if (!nextMarker) return;
+    openDetail(nextItem, nextMarker);
+    map.flyTo(nextMarker.getLatLng(), map.getZoom(), { duration: 0.45 });
+  }
   detailClose.addEventListener('click', closeDetail);
+  detailPanel.addEventListener('click', event => {
+    const control = event.target.closest?.('[data-detail-step]');
+    if (!control || control.disabled) return;
+    navigateDetail(Number(control.dataset.detailStep));
+  });
   map.on('click', () => {
     if (atlas.classList.contains('is-detail-open')) closeDetail();
   });
@@ -257,6 +282,7 @@
       countryGroups.set(flag, L.layerGroup().addTo(markers));
     }
     const marker = makeMarker(item);
+    item.marker = marker;
     countryGroups.get(flag).addLayer(marker);
   }
 

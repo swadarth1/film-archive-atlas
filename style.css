@@ -15,6 +15,11 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .detail-panel { position: relative; grid-column: 2; min-width: 0; overflow-y: auto; color: #20211e; background: #faf9f3; opacity: 0; pointer-events: none; transform: translateX(-36px); transition: opacity .24s ease, transform .24s ease; }
 .atlas.is-detail-open .detail-panel { opacity: 1; pointer-events: auto; transform: translateX(0); }
 .detail-close { position: absolute; z-index: 1; top: 14px; right: 14px; display: grid; width: 34px; height: 34px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .7); border: 0; border-radius: 0; cursor: pointer; font-size: 25px; line-height: 1; }
+.detail-card { position: relative; }
+.detail-navigation { position: absolute; z-index: 1; top: 14px; left: 14px; display: flex; }
+.detail-navigation button { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .7); border: 0; border-right: 1px solid rgb(255 255 252 / .25); border-radius: 0; cursor: pointer; font-size: 21px; line-height: 1; }
+.detail-navigation button:last-child { border-right: 0; }
+.detail-navigation button:disabled { cursor: default; opacity: .38; }
 .detail-photo { display: block; width: 100%; max-height: min(68vh, 720px); object-fit: contain; background: #deddd5; }
 .detail-body { padding: clamp(20px, 4vw, 42px); }
 .detail-kicker { margin: 0 0 10px; color: #75766f; font-size: 18px; line-height: 1; }
