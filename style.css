@@ -4,6 +4,11 @@ html, body { width: 100%; height: 100%; margin: 0; }
 body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #deddd5; color: #20211e; }
 .atlas { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) 0; width: 100%; height: 100%; min-height: 460px; overflow: hidden; transition: grid-template-columns .24s ease; }
 .atlas.is-detail-open { grid-template-columns: minmax(0, 58%) minmax(340px, 42%); }
+.atlas.is-stamp { display: block; min-height: 0; }
+.atlas.is-stamp #map { width: 100%; height: 100%; }
+.atlas.is-stamp .atlas-heading, .atlas.is-stamp .status, .atlas.is-stamp .leaflet-top, .atlas.is-stamp .leaflet-bottom.leaflet-left, .atlas.is-stamp .leaflet-control-zoom { display: none; }
+.atlas.is-stamp .leaflet-control-attribution { font-size: 7px; line-height: 1; }
+.atlas.is-stamp .photo-marker { cursor: default; }
 #map { position: relative; grid-column: 1; background: #d8d8d1; }
 .atlas-heading { position: absolute; z-index: 500; top: 20px; left: 22px; pointer-events: none; text-shadow: 0 1px 10px rgb(255 255 255 / .7); }
 .eyebrow { margin: 0 0 3px; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
@@ -31,7 +36,8 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .leaflet-control-zoom a, .atlas-map-actions a { color: #3e403a !important; background: #f7f6f0 !important; border-color: #b6b5aa !important; }
 .leaflet-top.leaflet-right { top: 14px; }
 .atlas-map-actions a { position: relative; display: grid !important; width: 28px !important; height: 28px !important; padding: 0; place-items: center; font-size: 18px; line-height: 1; }
-.atlas-map-actions__label { position: absolute; right: calc(100% + 8px); width: 116px; color: #3e403a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .08em; line-height: 1; text-align: right; text-transform: uppercase; white-space: nowrap; }
+.atlas-map-shortcuts { width: 180px; color: #3e403a; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .08em; line-height: 1.45; text-transform: uppercase; }
+.atlas-map-shortcuts span { display: block; white-space: nowrap; }
 .leaflet-control-attribution { background: rgb(248 247 241 / .8) !important; color: #54554e !important; }
 .photo-marker { background: transparent; border: 0; }
 .photo-marker__frame { position: relative; display: block; overflow: hidden; animation: marker-plot .42s cubic-bezier(.18, .8, .3, 1); box-shadow: 2px 2px 0 rgb(32 33 30 / .18); transition: transform .16s ease, box-shadow .16s ease; }

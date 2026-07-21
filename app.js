@@ -34,7 +34,7 @@
       button.href = '#';
       button.title = label;
       button.setAttribute('aria-label', label);
-      button.innerHTML = `<span class="atlas-map-actions__icon" aria-hidden="true">${icon}</span><span class="atlas-map-actions__label">${shortcut}</span>`;
+      button.innerHTML = `<span class="atlas-map-actions__icon" aria-hidden="true">${icon}</span>`;
       L.DomEvent.on(button, 'click', L.DomEvent.stop)
         .on(button, 'click', action);
     };
@@ -43,6 +43,14 @@
     return container;
   };
   mapActions.addTo(map);
+  const mapShortcuts = L.control({ position: 'bottomleft' });
+  mapShortcuts.onAdd = () => {
+    const shortcuts = L.DomUtil.create('div', 'atlas-map-shortcuts');
+    shortcuts.setAttribute('aria-label', 'Map navigation shortcuts');
+    shortcuts.innerHTML = '<span>F: fullscreen</span><span>R: reset</span><span>Shift + drag: area zoom</span><span>+ / −: zoom</span><span>← ↑ ↓ →: pan</span>';
+    return shortcuts;
+  };
+  mapShortcuts.addTo(map);
   document.addEventListener('fullscreenchange', () => map.invalidateSize());
   document.addEventListener('keydown', event => {
     if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -65,7 +73,17 @@
   let popupMarker;
   let detailRequest = 0;
   const requestedPhotoId = new URLSearchParams(window.location.search).get('photo');
+  const isStampEmbed = new URLSearchParams(window.location.search).get('embed') === 'stamp';
   if (requestedPhotoId) atlas.classList.add('is-deep-link');
+  if (isStampEmbed) {
+    atlas.classList.add('is-stamp');
+    map.dragging.disable();
+    map.scrollWheelZoom.disable();
+    map.doubleClickZoom.disable();
+    map.boxZoom.disable();
+    map.keyboard.disable();
+    map.touchZoom.disable();
+  }
   const normalizeKey = (key) => String(key || '').trim().toLowerCase();
   const FIELD_ALIASES = {
     photoid: 'id',
@@ -228,8 +246,8 @@
 
   function photoIcon(item, ratio = item.previewRatio || 1) {
     const thumbnail = item.thumbnail || item.image;
-    const height = 40;
-    const width = Math.round(Math.max(24, Math.min(64, height * ratio)));
+    const height = isStampEmbed ? 64 : 40;
+    const width = Math.round(Math.max(isStampEmbed ? 38 : 24, Math.min(isStampEmbed ? 102 : 64, height * ratio)));
     return L.divIcon({ className: 'photo-marker', html: `<span class="photo-marker__frame" style="width:${width}px;height:${height}px"><img class="photo-marker__image" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" style="width:${width}px;height:${height}px"><span class="photo-marker__shine" aria-hidden="true"></span></span>`, iconSize: [width, height], iconAnchor: [width / 2, height / 2], popupAnchor: [0, -21] });
   }
 
@@ -248,6 +266,7 @@
     marker.bindPopup(popupContent(item), { maxWidth: 300, minWidth: 250, closeButton: false, keepInView: true });
     if (item.countryflag) marker.bindTooltip(escapeHtml(item.countryflag), { className: 'country-flag-tooltip', direction: 'top', offset: [0, -22], opacity: 1 });
     marker.on('click', () => {
+      if (isStampEmbed) return;
       if (atlas.classList.contains('is-detail-open')) {
         openDetail(item, marker);
         return;
@@ -334,6 +353,18 @@
       console.warn(`No atlas photo matches the requested ID: ${requestedPhotoId}`);
       return;
     }
+    if (isStampEmbed) {
+      activeMarker = marker;
+      marker.setZIndexOffset(1000);
+      marker.getElement()?.classList.add('is-active');
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() => {
+          map.invalidateSize({ pan: false });
+          map.setView(marker.getLatLng(), 13, { animate: false });
+        });
+      });
+      return;
+    }
     const zoom = Math.max(map.getZoom(), 7);
     openDetail(item, marker);
     window.setTimeout(() => {
@@ -353,7 +384,9 @@
       if (!archive.length) { status.textContent = 'No valid photo locations were found in the sheet.'; return; }
       const bounds = L.latLngBounds(archive.map(item => [Number(item.latitude), Number(item.longitude)]));
       if (archive.length === 1) map.setView(bounds.getCenter(), 11); else map.fitBounds(bounds.pad(0.12), { maxZoom: 12 });
-      const completed = requestedPhotoId ? (render(), true) : await renderChronologically(archive);
+      const completed = requestedPhotoId
+        ? (render(isStampEmbed ? photo => normalizedId(photo.id) === normalizedId(requestedPhotoId) : () => true), true)
+        : await renderChronologically(archive);
       if (!completed) return;
       status.textContent = `${archive.length} photograph${archive.length === 1 ? '' : 's'} mapped`;
       focusRequestedPhoto();
