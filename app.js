@@ -2,7 +2,12 @@
 (() => {
   const DEFAULT_VIEW = [20, 0];
   const DEFAULT_ZOOM = 2;
+  const LOADING_SEQUENCE_DURATION_MS = 6500;
   const status = document.querySelector('#status');
+  const atlas = document.querySelector('.atlas');
+  const detailPanel = document.querySelector('#detail-panel');
+  const detailContent = document.querySelector('#detail-content');
+  const detailClose = document.querySelector('#detail-close');
   const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -12,30 +17,38 @@
   }).addTo(map);
 
   const mapActions = L.control({ position: 'topright' });
+  const toggleFullscreen = () => {
+    const fullscreenTarget = atlas;
+    const request = document.fullscreenElement ? document.exitFullscreen() : fullscreenTarget.requestFullscreen();
+    request?.catch(error => console.warn('Fullscreen is unavailable.', error));
+  };
+  const resetMapView = () => map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
   mapActions.onAdd = () => {
     const container = L.DomUtil.create('div', 'leaflet-bar atlas-map-actions');
-    const addButton = (label, tooltip, icon, action) => {
+    const addButton = (label, shortcut, icon, action) => {
       const button = L.DomUtil.create('a', '', container);
       button.href = '#';
       button.title = label;
       button.setAttribute('aria-label', label);
-      button.dataset.tooltip = tooltip;
-      button.textContent = icon;
+      button.innerHTML = `<span class="atlas-map-actions__icon" aria-hidden="true">${icon}</span><span class="atlas-map-actions__label">${shortcut}</span>`;
       L.DomEvent.on(button, 'click', L.DomEvent.stop)
         .on(button, 'click', action);
     };
-    addButton('Toggle fullscreen', 'Enter or exit fullscreen', '⛶', () => {
-      const fullscreenTarget = map.getContainer();
-      const request = document.fullscreenElement ? document.exitFullscreen() : fullscreenTarget.requestFullscreen();
-      request?.catch(error => console.warn('Fullscreen is unavailable.', error));
-    });
-    addButton('Reset map view', 'Reset map to the world view', '↺', () => map.setView(DEFAULT_VIEW, DEFAULT_ZOOM));
+    addButton('Toggle fullscreen', 'F for Fullscreen', '⛶', toggleFullscreen);
+    addButton('Reset map view', 'R to Reset', '↺', resetMapView);
     return container;
   };
   mapActions.addTo(map);
   document.addEventListener('fullscreenchange', () => map.invalidateSize());
   document.addEventListener('keydown', event => {
-    if (event.key === 'Escape') map.setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+    if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
+    if (event.key === 'Escape') {
+      if (atlas.classList.contains('is-detail-open')) closeDetail();
+      else if (popupMarker) popupMarker.closePopup();
+      else resetMapView();
+    }
+    if (event.key.toLowerCase() === 'r') resetMapView();
+    if (event.key.toLowerCase() === 'f') toggleFullscreen();
   });
 
   const markers = L.layerGroup().addTo(map);
@@ -44,6 +57,9 @@
   let archive = [];
   let countryGroups = new Map();
   let renderToken = 0;
+  let activeMarker;
+  let popupMarker;
+  let detailRequest = 0;
   const normalizeKey = (key) => String(key || '').trim().toLowerCase();
   const FIELD_ALIASES = {
     thumbnailurl: 'thumbnail',
@@ -94,17 +110,16 @@
     return parseCsv(payload);
   }
 
+  function detailPanelContent(item) {
+    const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
+    const details = [['Date', item.date ? formatDate(item.date) : ''], ['Camera', item.camera]].filter(([, value]) => value);
+    return `<article class="detail-card">${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<dl class="detail-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
+  }
+
   function popupContent(item) {
     const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
     const details = [['Camera', item.camera]].filter(([, value]) => value);
-    return `<article class="popup-card">${item.image || item.thumbnail ? `<img class="popup-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="popup-body">${item.date ? `<p class="popup-date">${escapeHtml(formatDate(item.date))}</p>` : ''}<h2 class="popup-place">${place}</h2>${details.length ? `<dl class="popup-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
-  }
-
-  function photoIcon(item, ratio = item.previewRatio || 1) {
-    const thumbnail = item.thumbnail || item.image;
-    const height = 40;
-    const width = Math.round(Math.max(24, Math.min(64, height * ratio)));
-    return L.divIcon({ className: 'photo-marker', html: `<span class="photo-marker__frame" style="width:${width}px;height:${height}px"><img class="photo-marker__image" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" style="width:${width}px;height:${height}px"><span class="photo-marker__shine" aria-hidden="true"></span></span>`, iconSize: [width, height], iconAnchor: [width / 2, height / 2], popupAnchor: [0, -21] });
+    return `<article class="popup-card">${item.image || item.thumbnail ? `<div class="popup-image-wrap"><img class="popup-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy"><button class="popup-expand" type="button" aria-label="Open photograph details" title="Open photograph details">⤢</button></div>` : ''}<div class="popup-body">${item.date ? `<p class="popup-date">${escapeHtml(formatDate(item.date))}</p>` : ''}<h2 class="popup-place">${place}</h2>${details.length ? `<dl class="popup-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
   }
 
   function keepPopupInView(marker) {
@@ -123,6 +138,68 @@
     });
   }
 
+  function closeDetail() {
+    detailRequest += 1;
+    activeMarker?.setZIndexOffset(0);
+    activeMarker?.getElement()?.classList.remove('is-active');
+    activeMarker = undefined;
+    atlas.classList.remove('is-detail-open');
+    detailPanel.setAttribute('aria-hidden', 'true');
+    window.setTimeout(() => map.invalidateSize(), 240);
+  }
+
+  function preloadDetailImage(item) {
+    const source = item.image || item.thumbnail;
+    if (!source) return Promise.resolve();
+    return new Promise(resolve => {
+      const image = new Image();
+      image.onload = resolve;
+      image.onerror = resolve;
+      image.src = source;
+      if (image.complete) resolve();
+    });
+  }
+
+  async function openDetail(item, marker) {
+    const request = ++detailRequest;
+    if (activeMarker && activeMarker !== marker) {
+      activeMarker.setZIndexOffset(0);
+      activeMarker.getElement()?.classList.remove('is-active');
+    }
+    marker.closePopup();
+    activeMarker = marker;
+    marker.setZIndexOffset(1000);
+    marker.getElement()?.classList.add('is-active');
+    atlas.classList.add('is-detail-open');
+    detailPanel.setAttribute('aria-hidden', 'false');
+    window.setTimeout(() => map.invalidateSize(), 240);
+    await preloadDetailImage(item);
+    if (request !== detailRequest) return;
+    detailContent.innerHTML = detailPanelContent(item);
+    detailPanel.scrollTop = 0;
+    detailContent.classList.remove('is-transitioning');
+    void detailContent.offsetWidth;
+    detailContent.classList.add('is-transitioning');
+  }
+  detailClose.addEventListener('click', closeDetail);
+  map.on('click', () => {
+    if (atlas.classList.contains('is-detail-open')) closeDetail();
+  });
+  document.addEventListener('click', event => {
+    const expandButton = event.target.closest?.('.popup-expand');
+    if (!expandButton || !popupMarker) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openDetail(popupMarker.options.item, popupMarker);
+  }, true);
+
+  function photoIcon(item, ratio = item.previewRatio || 1) {
+    const thumbnail = item.thumbnail || item.image;
+    const height = 40;
+    const width = Math.round(Math.max(24, Math.min(64, height * ratio)));
+    return L.divIcon({ className: 'photo-marker', html: `<span class="photo-marker__frame" style="width:${width}px;height:${height}px"><img class="photo-marker__image" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" style="width:${width}px;height:${height}px"><span class="photo-marker__shine" aria-hidden="true"></span></span>`, iconSize: [width, height], iconAnchor: [width / 2, height / 2], popupAnchor: [0, -21] });
+  }
+
   function makeMarker(item) {
     const icon = photoIcon(item);
     const marker = L.marker([Number(item.latitude), Number(item.longitude)], { icon, keyboard: true, title: [item.countryflag, item.city, item.country].filter(Boolean).join(' ') || 'Film photograph', item });
@@ -135,9 +212,13 @@
       };
       if (image?.complete) updateAspect(); else image?.addEventListener('load', updateAspect, { once: true });
     });
-    marker.bindPopup(popupContent(item), { maxWidth: 300, minWidth: 250, closeButton: true, keepInView: true });
+    marker.bindPopup(popupContent(item), { maxWidth: 300, minWidth: 250, closeButton: false, keepInView: true });
     if (item.countryflag) marker.bindTooltip(escapeHtml(item.countryflag), { className: 'country-flag-tooltip', direction: 'top', offset: [0, -22], opacity: 1 });
     marker.on('click', () => {
+      if (atlas.classList.contains('is-detail-open')) {
+        openDetail(item, marker);
+        return;
+      }
       const zoom = Math.max(map.getZoom() + 2, 7);
       const offset = map.getSize().y * 0.25;
       const center = map.unproject(map.project(marker.getLatLng(), zoom).subtract([0, offset]), zoom);
@@ -146,14 +227,22 @@
       map.flyTo(center, zoom, { duration: 0.45 });
     });
     marker.on('mouseover', () => marker.setZIndexOffset(1000));
-    marker.on('mouseout', () => { if (!marker.isPopupOpen()) marker.setZIndexOffset(0); });
+    marker.on('mouseout', () => { if (marker !== activeMarker) marker.setZIndexOffset(0); });
     marker.on('popupopen', () => {
       marker.setZIndexOffset(1000);
       marker.getElement()?.classList.add('is-active');
-      const photo = marker.getPopup().getElement()?.querySelector('.popup-photo');
+      popupMarker = marker;
+      const popup = marker.getPopup().getElement();
+      const photo = popup?.querySelector('.popup-photo');
       if (photo?.complete) keepPopupInView(marker); else photo?.addEventListener('load', () => keepPopupInView(marker), { once: true });
     });
-    marker.on('popupclose', () => { marker.setZIndexOffset(0); marker.getElement()?.classList.remove('is-active'); });
+    marker.on('popupclose', () => {
+      if (popupMarker === marker) popupMarker = undefined;
+      if (marker !== activeMarker) {
+        marker.setZIndexOffset(0);
+        marker.getElement()?.classList.remove('is-active');
+      }
+    });
     return marker;
   }
 
@@ -190,12 +279,13 @@
   async function renderChronologically(items) {
     const token = ++renderToken;
     const ordered = [...items].sort((a, b) => dateTimestamp(a.date) - dateTimestamp(b.date));
-    const delay = Math.max(18, Math.min(50, 6500 / ordered.length));
+    const delay = Math.max(18, Math.min(50, LOADING_SEQUENCE_DURATION_MS / ordered.length));
     clearMarkers();
     for (let index = 0; index < ordered.length; index += 1) {
       if (token !== renderToken) return false;
       addMarker(ordered[index]);
-      status.textContent = `Plotting ${index + 1} of ${ordered.length} photographs…`;
+      const date = ordered[index].date ? formatDate(ordered[index].date) : 'Undated photograph';
+      status.innerHTML = `<span>Plotting ${index + 1} of ${ordered.length} photographs…</span><span class="status-date">${escapeHtml(date)}</span>`;
       await new Promise(resolve => window.setTimeout(resolve, delay));
     }
     shineMarkers();
