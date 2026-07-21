@@ -35,6 +35,7 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .leaflet-control-attribution { background: rgb(248 247 241 / .8) !important; color: #54554e !important; }
 .photo-marker { background: transparent; border: 0; }
 .photo-marker__frame { position: relative; display: block; overflow: hidden; animation: marker-plot .42s cubic-bezier(.18, .8, .3, 1); box-shadow: 2px 2px 0 rgb(32 33 30 / .18); transition: transform .16s ease, box-shadow .16s ease; }
+.atlas.is-deep-link .photo-marker__frame { animation: none; }
 .photo-marker__image { display: block; object-fit: contain; border: 0; border-radius: 0; }
 .photo-marker:hover .photo-marker__frame { transform: scale(1.05) rotate(-1deg); box-shadow: 2px 2px 0 rgb(32 33 30 / .26); }
 .photo-marker.is-active .photo-marker__frame { transform: scale(1.05); box-shadow: 0 0 0 2px rgb(255 255 252 / .94), 0 0 11px 2px rgb(255 255 252 / .68); }

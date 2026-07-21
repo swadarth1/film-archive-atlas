@@ -64,8 +64,15 @@
   let activeMarker;
   let popupMarker;
   let detailRequest = 0;
+  const requestedPhotoId = new URLSearchParams(window.location.search).get('photo');
+  if (requestedPhotoId) atlas.classList.add('is-deep-link');
   const normalizeKey = (key) => String(key || '').trim().toLowerCase();
   const FIELD_ALIASES = {
+    photoid: 'id',
+    photo_id: 'id',
+    'photo id': 'id',
+    fileid: 'id',
+    file_id: 'id',
     thumbnailurl: 'thumbnail',
     imageurl: 'image',
     datetaken: 'date',
@@ -74,6 +81,7 @@
   };
   const canonicalKey = (key) => FIELD_ALIASES[normalizeKey(key)] || normalizeKey(key);
   const normalizeRow = (row) => Object.fromEntries(Object.entries(row).map(([key, value]) => [canonicalKey(key), value]));
+  const normalizedId = (value) => String(value || '').trim().toLowerCase();
   const validCoordinate = (value, min, max) => value !== null && value !== undefined && String(value).trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max;
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
   const formatDate = (value) => {
@@ -318,6 +326,24 @@
     return true;
   }
 
+  function focusRequestedPhoto() {
+    if (!requestedPhotoId) return;
+    const item = archive.find(photo => normalizedId(photo.id) === normalizedId(requestedPhotoId));
+    const marker = item?.marker;
+    if (!marker) {
+      console.warn(`No atlas photo matches the requested ID: ${requestedPhotoId}`);
+      return;
+    }
+    const zoom = Math.max(map.getZoom(), 7);
+    openDetail(item, marker);
+    window.setTimeout(() => {
+      map.invalidateSize();
+      const offset = map.getSize().y * 0.18;
+      const center = map.unproject(map.project(marker.getLatLng(), zoom).subtract([0, offset]), zoom);
+      map.flyTo(center, zoom, { duration: 0.55 });
+    }, 240);
+  }
+
   async function init() {
     if (!DATA_URL) { status.textContent = 'Add your public Google Sheet endpoint to config.js to load the archive.'; return; }
     try {
@@ -327,9 +353,10 @@
       if (!archive.length) { status.textContent = 'No valid photo locations were found in the sheet.'; return; }
       const bounds = L.latLngBounds(archive.map(item => [Number(item.latitude), Number(item.longitude)]));
       if (archive.length === 1) map.setView(bounds.getCenter(), 11); else map.fitBounds(bounds.pad(0.12), { maxZoom: 12 });
-      const completed = await renderChronologically(archive);
+      const completed = requestedPhotoId ? (render(), true) : await renderChronologically(archive);
       if (!completed) return;
       status.textContent = `${archive.length} photograph${archive.length === 1 ? '' : 's'} mapped`;
+      focusRequestedPhoto();
       window.FilmAtlas = { filter: predicate => render(predicate), clearFilter: () => render(), data: () => [...archive] };
     } catch (error) { console.error(error); status.textContent = `Could not load the archive. ${error.message}`; }
   }
