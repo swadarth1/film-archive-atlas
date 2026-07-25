@@ -21,16 +21,19 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .atlas.is-detail-open .detail-panel { opacity: 1; pointer-events: auto; transform: translateX(0); }
 .detail-close { position: absolute; z-index: 1; top: 14px; right: 14px; display: grid; width: 34px; height: 34px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .7); border: 0; border-radius: 0; cursor: pointer; font-size: 25px; line-height: 1; }
 .detail-card { position: relative; }
-.detail-navigation { position: absolute; z-index: 1; top: 14px; left: 14px; display: flex; }
-.detail-navigation button { display: grid; width: 34px; height: 34px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .7); border: 0; border-right: 1px solid rgb(255 255 252 / .25); border-radius: 0; cursor: pointer; font-size: 21px; line-height: 1; }
-.detail-navigation button:last-child { border-right: 0; }
-.detail-navigation button:disabled { cursor: default; opacity: .38; }
 .detail-photo { display: block; width: 100%; max-height: min(68vh, 720px); object-fit: contain; background: #deddd5; }
 .detail-body { padding: clamp(20px, 4vw, 42px); }
 .detail-kicker { margin: 0 0 10px; color: #75766f; font-size: 18px; line-height: 1; }
 .detail-place { margin: 0 0 28px; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, Georgia, serif; font-size: clamp(30px, 4vw, 52px); font-weight: 400; letter-spacing: -.03em; line-height: .95; }
 .detail-meta { display: grid; gap: 10px; margin: 0; color: #575850; font-size: 14px; line-height: 1.4; }
-.detail-meta div { display: grid; grid-template-columns: 74px 1fr; gap: 10px; }.detail-meta dt { color: #85867e; }.detail-meta dd { margin: 0; }
+.chronology-link { stroke-linecap: round; }
+.chronology-marker-navigation { background: transparent; border: 0; }
+.chronology-marker-navigation__controls { display: flex; box-shadow: 0 2px 7px rgb(23 25 20 / .2); }
+.chronology-marker-navigation button { position: relative; display: grid; width: 34px; height: 30px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .82); border: 0; border-right: 1px solid rgb(255 255 252 / .25); cursor: pointer; font-size: 20px; line-height: 1; }
+.chronology-marker-navigation button:last-child { border-right: 0; }
+.chronology-marker-navigation button:disabled { cursor: default; opacity: .38; }
+.chronology-marker-navigation button::after { position: absolute; bottom: calc(100% + 7px); left: 50%; z-index: 2; padding: 5px 7px; color: #fdfcf7; background: rgb(32 33 30 / .9); content: attr(data-tooltip); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .04em; line-height: 1; opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .14s ease, transform .14s ease; white-space: nowrap; }
+.chronology-marker-navigation button:hover::after, .chronology-marker-navigation button:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 #detail-content.is-transitioning { animation: detail-content-in .34s ease-out both; }
 @keyframes detail-content-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
 .leaflet-control-zoom a, .atlas-map-actions a { color: #3e403a !important; background: #f7f6f0 !important; border-color: #b6b5aa !important; }
@@ -45,7 +48,7 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .photo-marker__image { display: block; object-fit: contain; border: 0; border-radius: 0; }
 .photo-marker:hover .photo-marker__frame { transform: scale(1.05) rotate(-1deg); box-shadow: 2px 2px 0 rgb(32 33 30 / .26); }
 .photo-marker.is-active .photo-marker__frame { transform: scale(1.05); box-shadow: 0 0 0 2px rgb(255 255 252 / .94), 0 0 11px 2px rgb(255 255 252 / .68); }
-@keyframes marker-plot { from { opacity: 0; transform: translateY(-48px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes marker-plot { from { opacity: 0; transform: translateY(-24px) scale(.94); } to { opacity: 1; transform: translateY(0) scale(1); } }
 .photo-marker__shine { position: absolute; top: -30%; bottom: -30%; left: -55%; width: 38%; background: linear-gradient(100deg, transparent, rgb(255 255 255 / .58), transparent); opacity: 0; pointer-events: none; transform: skewX(-18deg); }
 .photo-marker.is-shining .photo-marker__shine { animation: photo-shine .52s ease-out both; }
 @keyframes photo-shine { 0% { opacity: 0; transform: translateX(0) skewX(-18deg); } 14% { opacity: 1; } 86% { opacity: 1; } 100% { opacity: 0; transform: translateX(420%) skewX(-18deg); } }

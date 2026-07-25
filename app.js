@@ -8,7 +8,7 @@
   const detailPanel = document.querySelector('#detail-panel');
   const detailContent = document.querySelector('#detail-content');
   const detailClose = document.querySelector('#detail-close');
-  const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
+  const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, wheelPxPerZoomLevel: 120 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 20,
@@ -43,7 +43,7 @@
     return container;
   };
   mapActions.addTo(map);
-  const mapShortcuts = L.control({ position: 'bottomleft' });
+  const mapShortcuts = L.control({ position: 'topleft' });
   mapShortcuts.onAdd = () => {
     const shortcuts = L.DomUtil.create('div', 'atlas-map-shortcuts');
     shortcuts.setAttribute('aria-label', 'Map navigation shortcuts');
@@ -63,6 +63,7 @@
     if (event.key.toLowerCase() === 'f') toggleFullscreen();
   }, true);
 
+  const chronologyLinks = L.layerGroup().addTo(map);
   const markers = L.layerGroup().addTo(map);
 
   // Kept separate from the map layer so future UI filters can re-render markers only.
@@ -142,15 +143,59 @@
 
   function detailPanelContent(item) {
     const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
-    const details = [['Date', item.date ? formatDate(item.date) : ''], ['Camera', item.camera]].filter(([, value]) => value);
-    const timeline = chronologicalArchive();
-    const index = timeline.indexOf(item);
-    const previousDisabled = index <= 0 ? ' disabled' : '';
-    const nextDisabled = index === -1 || index >= timeline.length - 1 ? ' disabled' : '';
-    return `<article class="detail-card"><nav class="detail-navigation" aria-label="Photo navigation"><button type="button" data-detail-step="-1" aria-label="Previous photograph"${previousDisabled}>←</button><button type="button" data-detail-step="1" aria-label="Next photograph"${nextDisabled}>→</button></nav>${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<dl class="detail-meta">${details.map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>` : ''}</div></article>`;
+    const details = [
+      ['Date', item.date ? formatDate(item.date) : ''],
+      ['Camera', item.camera],
+      ['Closest song', item.song]
+    ].filter(([, value]) => value);
+    return `<article class="detail-card">${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<div class="detail-meta">${details.map(([, value]) => `<div>${escapeHtml(value)}</div>`).join('')}</div>` : ''}</div></article>`;
   }
 
   const chronologicalArchive = () => [...archive].sort((a, b) => dateTimestamp(a.date) - dateTimestamp(b.date));
+
+  function updateChronologyLinks() {
+    chronologyLinks.clearLayers();
+    const selected = activeMarker?.options.item;
+    if (!selected) return;
+    const timeline = chronologicalArchive();
+    const index = timeline.indexOf(selected);
+    const connections = [[timeline[index - 1], selected], [selected, timeline[index + 1]]];
+    connections.forEach(([from, to]) => {
+      if (!from?.marker || !to?.marker) return;
+      const fromLatLng = from.marker.getLatLng();
+      const toLatLng = to.marker.getLatLng();
+      const fromPoint = map.latLngToLayerPoint(fromLatLng);
+      const toPoint = map.latLngToLayerPoint(toLatLng);
+      if (fromPoint.equals(toPoint)) return;
+      L.polyline([fromLatLng, toLatLng], { className: 'chronology-link', color: '#56574f', weight: 1.5, opacity: 0.7, dashArray: '5 7', interactive: false }).addTo(chronologyLinks);
+    });
+    const previous = timeline[index - 1];
+    const next = timeline[index + 1];
+    const navigation = L.marker(selected.marker.getLatLng(), {
+      icon: L.divIcon({
+        className: 'chronology-marker-navigation',
+        html: `<div class="chronology-marker-navigation__controls"><button type="button" data-chronology-step="-1" data-tooltip="Previous photo" aria-label="Previous photograph"${previous ? '' : ' disabled'}>←</button><button type="button" data-chronology-step="1" data-tooltip="Next photo" aria-label="Next photograph"${next ? '' : ' disabled'}>→</button></div>`,
+        iconSize: [68, 30],
+        iconAnchor: [34, 66]
+      }),
+      bubblingMouseEvents: false,
+      keyboard: false,
+      zIndexOffset: 1500
+    });
+    navigation.on('add', () => {
+      const controls = navigation.getElement();
+      L.DomEvent.disableClickPropagation(controls);
+      controls.querySelectorAll('[data-chronology-step]').forEach(button => {
+        L.DomEvent.on(button, 'click', () => {
+          const linkedItem = Number(button.dataset.chronologyStep) < 0 ? previous : next;
+          if (!linkedItem) return;
+          openDetail(linkedItem, linkedItem.marker);
+          map.flyTo(linkedItem.marker.getLatLng(), map.getZoom(), { duration: 0.45 });
+        });
+      });
+    });
+    navigation.addTo(chronologyLinks);
+  }
 
   function popupContent(item) {
     const place = [item.city, item.state, item.country].filter(Boolean).map(escapeHtml).join(', ') || 'Untitled location';
@@ -176,6 +221,7 @@
 
   function closeDetail() {
     detailRequest += 1;
+    chronologyLinks.clearLayers();
     activeMarker?.setZIndexOffset(0);
     activeMarker?.getElement()?.classList.remove('is-active');
     activeMarker = undefined;
@@ -206,6 +252,7 @@
     activeMarker = marker;
     marker.setZIndexOffset(1000);
     marker.getElement()?.classList.add('is-active');
+    updateChronologyLinks();
     atlas.classList.add('is-detail-open');
     detailPanel.setAttribute('aria-hidden', 'false');
     window.setTimeout(() => map.invalidateSize(), 240);
@@ -217,25 +264,11 @@
     void detailContent.offsetWidth;
     detailContent.classList.add('is-transitioning');
   }
-  function navigateDetail(step) {
-    const current = activeMarker?.options.item;
-    if (!current) return;
-    const timeline = chronologicalArchive();
-    const nextItem = timeline[timeline.indexOf(current) + step];
-    const nextMarker = nextItem?.marker;
-    if (!nextMarker) return;
-    openDetail(nextItem, nextMarker);
-    map.flyTo(nextMarker.getLatLng(), map.getZoom(), { duration: 0.45 });
-  }
   detailClose.addEventListener('click', closeDetail);
-  detailPanel.addEventListener('click', event => {
-    const control = event.target.closest?.('[data-detail-step]');
-    if (!control || control.disabled) return;
-    navigateDetail(Number(control.dataset.detailStep));
-  });
   map.on('click', () => {
     if (atlas.classList.contains('is-detail-open')) closeDetail();
   });
+  map.on('zoomend resize', updateChronologyLinks);
   document.addEventListener('click', event => {
     const expandButton = event.target.closest?.('.popup-expand');
     if (!expandButton || !popupMarker) return;
