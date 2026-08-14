@@ -7,6 +7,7 @@
   const atlas = document.querySelector('.atlas');
   const detailPanel = document.querySelector('#detail-panel');
   const detailContent = document.querySelector('#detail-content');
+  const detailNavigation = document.querySelector('#detail-navigation');
   const detailClose = document.querySelector('#detail-close');
   const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, wheelPxPerZoomLevel: 120 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
@@ -103,15 +104,40 @@
   const normalizedId = (value) => String(value || '').trim().toLowerCase();
   const validCoordinate = (value, min, max) => value !== null && value !== undefined && String(value).trim() !== '' && Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max;
   const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
+  // Dates in the Sheet describe when the photograph was taken. They are not
+  // viewer-local timestamps: an ISO value ending in Z must not be shifted when
+  // it is displayed in another timezone.
+  const parsePhotoDate = (value) => {
+    const text = String(value || '').trim();
+    if (!text) return new Date(NaN);
+
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T\s]+(\d{1,2})(?::(\d{2}))?(?::(\d{2})(?:\.\d+)?)?)?(?:\s*(?:Z|[+-]\d{2}:?\d{2}))?$/i);
+    const american = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})(?:,?\s+(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(AM|PM)?)?$/i);
+    if (iso) {
+      const [, year, month, day, hour = '0', minute = '0', second = '0'] = iso;
+      return new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+    }
+    if (american) {
+      let [, month, day, year, hour = '0', minute = '0', second = '0', meridiem] = american;
+      const fullYear = Number(year) < 100 ? 2000 + Number(year) : Number(year);
+      let hours = Number(hour);
+      if (meridiem) {
+        if (hours === 12) hours = 0;
+        if (meridiem.toUpperCase() === 'PM') hours += 12;
+      }
+      return new Date(fullYear, Number(month) - 1, Number(day), hours, Number(minute), Number(second));
+    }
+    return new Date(text);
+  };
   const formatDate = (value) => {
-    const date = new Date(value);
+    const date = parsePhotoDate(value);
     if (Number.isNaN(date.getTime())) return value;
     const dateText = new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
     const timeText = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }).format(date);
     return `${dateText} at ${timeText}`;
   };
   const dateTimestamp = (value) => {
-    const timestamp = new Date(value).getTime();
+    const timestamp = parsePhotoDate(value).getTime();
     return Number.isNaN(timestamp) ? Number.POSITIVE_INFINITY : timestamp;
   };
 
@@ -148,7 +174,18 @@
       ['Camera', item.camera],
       ['Closest song', item.song]
     ].filter(([, value]) => value);
-    return `<article class="detail-card">${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<div class="detail-meta">${details.map(([, value]) => `<div>${escapeHtml(value)}</div>`).join('')}</div>` : ''}</div></article>`;
+    return `<article class="detail-card">${item.image || item.thumbnail ? `<img class="detail-photo" src="${escapeHtml(item.image || item.thumbnail)}" alt="" loading="lazy">` : ''}<div class="detail-body"><p class="detail-kicker">${escapeHtml(item.countryflag || 'Film photograph')}</p><h2 class="detail-place">${place}</h2>${details.length ? `<div class="detail-meta">${details.map(([label, value]) => `<div>${escapeHtml(value)}${label === 'Closest song' ? '<span class="song-info" tabindex="0" data-tooltip="The song I listened to closest to when this photo was taken" aria-label="The song closest listened to when this photo was taken">?</span>' : ''}</div>`).join('')}</div>` : ''}</div></article>`;
+  }
+
+  function detailNavigationContent(item) {
+    const timeline = chronologicalArchive();
+    const index = timeline.indexOf(item);
+    const previous = timeline[index - 1];
+    const next = timeline[index + 1];
+    const preview = photo => photo?.image || photo?.thumbnail
+      ? `<span class="detail-navigation-preview"><img src="${escapeHtml(photo.image || photo.thumbnail)}" alt="" loading="lazy">${photo.date ? `<span>${escapeHtml(formatDate(photo.date))}</span>` : ''}</span>`
+      : '';
+    return `<button type="button" data-detail-step="-1" aria-label="Previous photograph"${previous ? '' : ' disabled'}>${preview(previous)}←</button><button type="button" data-detail-step="1" aria-label="Next photograph"${next ? '' : ' disabled'}>${preview(next)}→</button>`;
   }
 
   const chronologicalArchive = () => [...archive].sort((a, b) => dateTimestamp(a.date) - dateTimestamp(b.date));
@@ -169,32 +206,6 @@
       if (fromPoint.equals(toPoint)) return;
       L.polyline([fromLatLng, toLatLng], { className: 'chronology-link', color: '#56574f', weight: 1.5, opacity: 0.7, dashArray: '5 7', interactive: false }).addTo(chronologyLinks);
     });
-    const previous = timeline[index - 1];
-    const next = timeline[index + 1];
-    const navigation = L.marker(selected.marker.getLatLng(), {
-      icon: L.divIcon({
-        className: 'chronology-marker-navigation',
-        html: `<div class="chronology-marker-navigation__controls"><button type="button" data-chronology-step="-1" data-tooltip="Previous photo" aria-label="Previous photograph"${previous ? '' : ' disabled'}>←</button><button type="button" data-chronology-step="1" data-tooltip="Next photo" aria-label="Next photograph"${next ? '' : ' disabled'}>→</button></div>`,
-        iconSize: [68, 30],
-        iconAnchor: [34, 66]
-      }),
-      bubblingMouseEvents: false,
-      keyboard: false,
-      zIndexOffset: 1500
-    });
-    navigation.on('add', () => {
-      const controls = navigation.getElement();
-      L.DomEvent.disableClickPropagation(controls);
-      controls.querySelectorAll('[data-chronology-step]').forEach(button => {
-        L.DomEvent.on(button, 'click', () => {
-          const linkedItem = Number(button.dataset.chronologyStep) < 0 ? previous : next;
-          if (!linkedItem) return;
-          openDetail(linkedItem, linkedItem.marker);
-          map.flyTo(linkedItem.marker.getLatLng(), map.getZoom(), { duration: 0.45 });
-        });
-      });
-    });
-    navigation.addTo(chronologyLinks);
   }
 
   function popupContent(item) {
@@ -259,12 +270,28 @@
     await preloadDetailImage(item);
     if (request !== detailRequest) return;
     detailContent.innerHTML = detailPanelContent(item);
-    detailPanel.scrollTop = 0;
+    detailNavigation.innerHTML = detailNavigationContent(item);
+    detailContent.scrollTop = 0;
     detailContent.classList.remove('is-transitioning');
     void detailContent.offsetWidth;
     detailContent.classList.add('is-transitioning');
   }
+  function navigateDetail(step) {
+    const current = activeMarker?.options.item;
+    if (!current) return;
+    const timeline = chronologicalArchive();
+    const nextItem = timeline[timeline.indexOf(current) + step];
+    const nextMarker = nextItem?.marker;
+    if (!nextMarker) return;
+    openDetail(nextItem, nextMarker);
+    map.flyTo(nextMarker.getLatLng(), map.getZoom(), { duration: 0.45 });
+  }
   detailClose.addEventListener('click', closeDetail);
+  detailPanel.addEventListener('click', event => {
+    const control = event.target.closest?.('[data-detail-step]');
+    if (!control || control.disabled) return;
+    navigateDetail(Number(control.dataset.detailStep));
+  });
   map.on('click', () => {
     if (atlas.classList.contains('is-detail-open')) closeDetail();
   });

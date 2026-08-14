@@ -17,7 +17,7 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .atlas.is-detail-open .status { left: 29%; }
 .status-date { display: block; margin-top: 2px; color: #75766f; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .status:empty { display: none; }
-.detail-panel { position: relative; grid-column: 2; min-width: 0; overflow-y: auto; color: #20211e; background: #faf9f3; opacity: 0; pointer-events: none; transform: translateX(-36px); transition: opacity .24s ease, transform .24s ease; }
+.detail-panel { position: relative; display: flex; flex-direction: column; grid-column: 2; min-width: 0; overflow: hidden; color: #20211e; background: #faf9f3; opacity: 0; pointer-events: none; transform: translateX(-36px); transition: opacity .24s ease, transform .24s ease; }
 .atlas.is-detail-open .detail-panel { opacity: 1; pointer-events: auto; transform: translateX(0); }
 .detail-close { position: absolute; z-index: 1; top: 14px; right: 14px; display: grid; width: 34px; height: 34px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .7); border: 0; border-radius: 0; cursor: pointer; font-size: 25px; line-height: 1; }
 .detail-card { position: relative; }
@@ -26,14 +26,18 @@ h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, G
 .detail-kicker { margin: 0 0 10px; color: #75766f; font-size: 18px; line-height: 1; }
 .detail-place { margin: 0 0 28px; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, Georgia, serif; font-size: clamp(30px, 4vw, 52px); font-weight: 400; letter-spacing: -.03em; line-height: .95; }
 .detail-meta { display: grid; gap: 10px; margin: 0; color: #575850; font-size: 14px; line-height: 1.4; }
+.song-info { position: relative; display: inline-grid; width: 14px; height: 14px; margin-left: 6px; place-items: center; color: rgb(62 64 58 / .58); border: 1px solid currentColor; border-radius: 50%; cursor: help; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 9px; font-weight: 700; line-height: 1; vertical-align: 1px; }
+.song-info::after { position: absolute; bottom: calc(100% + 7px); left: 50%; z-index: 3; width: 190px; padding: 6px 8px; color: #fdfcf7; background: rgb(32 33 30 / .9); content: attr(data-tooltip); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 10px; font-weight: 500; letter-spacing: 0; line-height: 1.3; opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .14s ease, transform .14s ease; }
+.song-info:hover::after, .song-info:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
+#detail-content { min-height: 0; flex: 1; overflow-y: auto; }
+.detail-panel-navigation { display: grid; flex: 0 0 52px; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid rgb(76 75 66 / .18); }
+.detail-panel-navigation button { position: relative; min-height: 52px; padding: 0; color: #3e403a; background: transparent; border: 0; border-right: 1px solid rgb(76 75 66 / .18); cursor: pointer; font-family: inherit; font-size: 22px; line-height: 1; }
+.detail-panel-navigation button:last-child { border-right: 0; }
+.detail-panel-navigation button:disabled { cursor: default; opacity: .35; }
+.detail-navigation-preview { position: absolute; bottom: calc(100% + 10px); left: 50%; z-index: 2; display: grid; width: 130px; gap: 4px; color: #696a62; font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 9px; font-weight: 600; letter-spacing: .03em; line-height: 1.2; text-align: center; opacity: 0; pointer-events: none; transform: translate(-50%, 4px) scale(.96); transition: opacity .14s ease, transform .14s ease; }
+.detail-navigation-preview img { display: block; width: auto; max-width: 112px; height: 76px; margin: 0 auto; background: transparent; box-shadow: 0 5px 16px rgb(23 25 20 / .22); object-fit: contain; }
+.detail-panel-navigation button:hover .detail-navigation-preview, .detail-panel-navigation button:focus-visible .detail-navigation-preview { opacity: 1; transform: translate(-50%, 0) scale(1); }
 .chronology-link { stroke-linecap: round; }
-.chronology-marker-navigation { background: transparent; border: 0; }
-.chronology-marker-navigation__controls { display: flex; box-shadow: 0 2px 7px rgb(23 25 20 / .2); }
-.chronology-marker-navigation button { position: relative; display: grid; width: 34px; height: 30px; padding: 0; place-items: center; color: #fdfcf7; background: rgb(32 33 30 / .82); border: 0; border-right: 1px solid rgb(255 255 252 / .25); cursor: pointer; font-size: 20px; line-height: 1; }
-.chronology-marker-navigation button:last-child { border-right: 0; }
-.chronology-marker-navigation button:disabled { cursor: default; opacity: .38; }
-.chronology-marker-navigation button::after { position: absolute; bottom: calc(100% + 7px); left: 50%; z-index: 2; padding: 5px 7px; color: #fdfcf7; background: rgb(32 33 30 / .9); content: attr(data-tooltip); font-family: Inter, ui-sans-serif, system-ui, sans-serif; font-size: 10px; font-weight: 700; letter-spacing: .04em; line-height: 1; opacity: 0; pointer-events: none; transform: translate(-50%, 3px); transition: opacity .14s ease, transform .14s ease; white-space: nowrap; }
-.chronology-marker-navigation button:hover::after, .chronology-marker-navigation button:focus-visible::after { opacity: 1; transform: translate(-50%, 0); }
 #detail-content.is-transitioning { animation: detail-content-in .34s ease-out both; }
 @keyframes detail-content-in { from { opacity: 0; transform: translateX(-14px); } to { opacity: 1; transform: translateX(0); } }
 .leaflet-control-zoom a, .atlas-map-actions a { color: #3e403a !important; background: #f7f6f0 !important; border-color: #b6b5aa !important; }
