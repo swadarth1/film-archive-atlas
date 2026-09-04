@@ -11,7 +11,7 @@
   const detailClose = document.querySelector('#detail-close');
   const map = L.map('map', { zoomControl: false, preferCanvas: true, zoomSnap: 0, wheelPxPerZoomLevel: 120 }).setView(DEFAULT_VIEW, DEFAULT_ZOOM);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png?key=cb1_2x03_1_0c66f0fa889e99c5c65eb001', {
     maxZoom: 20,
     subdomains: 'abcd',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
@@ -389,6 +389,19 @@
     }));
   }
 
+  function loadingTimeline(items, item, index) {
+    const timestamps = items.map(photo => dateTimestamp(photo.date)).filter(Number.isFinite);
+    const current = dateTimestamp(item.date);
+    if (!timestamps.length || !Number.isFinite(current)) {
+      return { position: Math.round(((index + 1) / items.length) * 100), start: '', end: '' };
+    }
+    const start = Math.min(...timestamps);
+    const end = Math.max(...timestamps);
+    const position = start === end ? 50 : Math.max(0, Math.min(100, ((current - start) / (end - start)) * 100));
+    const formatYear = timestamp => new Intl.DateTimeFormat('en-US', { year: 'numeric' }).format(new Date(timestamp));
+    return { position, start: formatYear(start), end: formatYear(end) };
+  }
+
   async function renderChronologically(items) {
     const token = ++renderToken;
     const ordered = [...items].sort((a, b) => dateTimestamp(a.date) - dateTimestamp(b.date));
@@ -398,7 +411,8 @@
       if (token !== renderToken) return false;
       addMarker(ordered[index]);
       const date = ordered[index].date ? formatDate(ordered[index].date) : 'Undated photograph';
-      status.innerHTML = `<span>Plotting ${index + 1} of ${ordered.length} photographs…</span><span class="status-date">${escapeHtml(date)}</span>`;
+      const timeline = loadingTimeline(ordered, ordered[index], index);
+      status.innerHTML = `<span>Plotting ${index + 1} of ${ordered.length} photographs…</span><span class="status-date">${escapeHtml(date)}</span><span class="status-timeline" aria-label="Archive timeline"><span class="status-timeline__fill" style="width: ${timeline.position}%"></span><span class="status-timeline__marker" style="left: ${timeline.position}%"></span></span><span class="status-timeline-labels"><span>${timeline.start}</span><span>${timeline.end}</span></span>`;
       await new Promise(resolve => window.setTimeout(resolve, delay));
     }
     shineMarkers();
@@ -436,6 +450,7 @@
   }
 
   async function init() {
+    status.classList.remove('is-complete');
     if (!DATA_URL) { status.textContent = 'Add your public Google Sheet endpoint to config.js to load the archive.'; return; }
     try {
       const rows = await getRows(DATA_URL);
@@ -449,6 +464,7 @@
         : await renderChronologically(archive);
       if (!completed) return;
       status.textContent = `${archive.length} photograph${archive.length === 1 ? '' : 's'} mapped`;
+      status.classList.add('is-complete');
       focusRequestedPhoto();
       window.FilmAtlas = { filter: predicate => render(predicate), clearFilter: () => render(), data: () => [...archive] };
     } catch (error) { console.error(error); status.textContent = `Could not load the archive. ${error.message}`; }

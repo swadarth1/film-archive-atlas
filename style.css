@@ -13,9 +13,14 @@ body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSyst
 .atlas-heading { position: absolute; z-index: 500; top: 20px; left: 22px; pointer-events: none; text-shadow: 0 1px 10px rgb(255 255 255 / .7); }
 .eyebrow { margin: 0 0 3px; font-size: 9px; font-weight: 700; letter-spacing: .16em; }
 h1 { margin: 0; font-family: "Apple Garamond", "Adobe Garamond Pro", Garamond, Georgia, serif; font-size: clamp(25px, 3vw, 38px); font-weight: 400; letter-spacing: -.04em; }
-.status { position: absolute; z-index: 500; top: 14px; left: 50%; max-width: min(330px, calc(100% - 28px)); padding: 8px 10px; color: #353630; background: rgb(248 247 241 / .92); border: 1px solid rgb(76 75 66 / .18); box-shadow: 0 3px 12px rgb(30 30 25 / .1); font-size: 12px; line-height: 1.35; transform: translateX(-50%); transition: left .24s ease; }
+.status { position: absolute; z-index: 500; top: 14px; left: 50%; width: min(330px, calc(100% - 28px)); padding: 8px 10px; color: #353630; background: rgb(248 247 241 / .92); border: 1px solid rgb(76 75 66 / .18); box-shadow: 0 3px 12px rgb(30 30 25 / .1); font-size: 12px; line-height: 1.35; transform: translateX(-50%); transition: left .24s ease; }
 .atlas.is-detail-open .status { left: 29%; }
+.status.is-complete { text-align: center; }
 .status-date { display: block; margin-top: 2px; color: #75766f; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.status-timeline { position: relative; display: block; height: 2px; margin-top: 8px; background: rgb(66 67 61 / .18); }
+.status-timeline__fill { position: absolute; top: 0; bottom: 0; left: 0; background: #454740; transition: width .12s linear; }
+.status-timeline__marker { position: absolute; top: 50%; width: 7px; height: 7px; border: 1px solid #f8f7f1; border-radius: 50%; background: #454740; box-shadow: 0 0 0 1px rgb(52 53 48 / .55); transform: translate(-50%, -50%); transition: left .12s linear; }
+.status-timeline-labels { display: flex; justify-content: space-between; margin-top: 3px; color: #8b8c84; font-size: 8px; font-weight: 700; letter-spacing: .08em; line-height: 1; }
 .status:empty { display: none; }
 .detail-panel { position: relative; display: flex; flex-direction: column; grid-column: 2; min-width: 0; overflow: hidden; color: #20211e; background: #faf9f3; opacity: 0; pointer-events: none; transform: translateX(-36px); transition: opacity .24s ease, transform .24s ease; }
 .atlas.is-detail-open .detail-panel { opacity: 1; pointer-events: auto; transform: translateX(0); }
